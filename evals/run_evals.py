@@ -4,10 +4,13 @@
     python evals/run_evals.py e4 own1    # only these cases
 
 Exit code 0 only if every case passes 5/5.
+On a free API key, set EVAL_PAUSE_SECONDS (e.g. 5) to stay under per-minute rate limits.
 """
 
 import json
+import os
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,6 +21,7 @@ from run import respond             # noqa: E402  (the same function run.py uses
 from shelfhelp import llm           # noqa: E402
 
 RUNS = 5
+PAUSE = float(os.getenv("EVAL_PAUSE_SECONDS", "0"))
 
 
 def main() -> int:
@@ -31,7 +35,9 @@ def main() -> int:
     rows, all_green = [], True
     for case in cases:
         passes, failed = 0, set()
+        print(f"running {case['id']} ...", flush=True)
         for _ in range(RUNS):
+            time.sleep(PAUSE)
             response = respond(case["text"], case["id"])
             failing = [name for name in case["checks"] if not run_check(name, response, case)]
             if failing:
