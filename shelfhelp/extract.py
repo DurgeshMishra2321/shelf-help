@@ -1,5 +1,6 @@
 """Customer text -> Intent, using the LLM, with validation and bounded retries."""
 
+import re
 import time
 
 from pydantic import ValidationError
@@ -67,10 +68,60 @@ def extract(text: str, attempts: list | None = None) -> Intent:
             continue
         attempts.append({"attempt": attempt, "raw": raw})
         try:
-            return Intent.model_validate_json(strip_code_fences(raw))
+            intent = Intent.model_validate_json(strip_code_fences(raw))
+            return cross_check_budget(intent, text)
         except ValidationError as e:
             log("invalid_llm_output", attempt=attempt, error=str(e))
             # Tell the model what was wrong and try again.
             user = (f"<customer_text>\n{text}\n</customer_text>\n\n"
                     f"Your last output was invalid: {e}\nReturn only the corrected JSON object.")
     raise ExtractionFailed("no valid intent after 3 attempts")
+
+
+# ---- Code-side budget check (defence in depth) ----------------------------
+
+# A number, with an optional currency marker before or after it.
+AMOUNT = re.compile(
+    r"(?P<before>₹|\brs\.?|\binr)?\s*"
+    r"(?P<number>\d+(?:,\d+)*)(?P<k>k\b)?"
+    r"(?P<after>\s*(?:rupees|rs\b|inr\b|/-|%))?",
+    re.IGNORECASE,
+)
+PRODUCT_WORDS = r"(?:mango|mangoes|lime|limes|soda|water|berry|berries|fizz|drinks?)"
+# "5 cases", "2 mango" -> a quantity, not a budget.
+QUANTITY_AFTER = re.compile(r"\s*(?:x\b|cases?|crates?|boxe?s?|bottles?|packs?|cartons?|"
+                            + PRODUCT_WORDS + ")", re.IGNORECASE)
+# "mango ₹1", "mango at 1" -> a (made up) price, not a budget.
+PRODUCT_BEFORE = re.compile(PRODUCT_WORDS + r"\s*(?:at|for|is|to|=|@)?\s*$", re.IGNORECASE)
+
+
+def find_budget_amounts(text: str) -> list[int]:
+    """Every distinct rupee amount in the text that looks like a budget."""
+    amounts = []
+    for match in AMOUNT.finditer(text):
+        after = (match.group("after") or "").strip().lower()
+        if after == "%":
+            continue                                   # "50% discount"
+        marked = bool(match.group("before") or after)
+        if not marked and QUANTITY_AFTER.match(text, match.end()):
+            continue                                   # "5 cases", "2 mango"
+        if PRODUCT_BEFORE.search(text[:match.start()]):
+            continue                                   # "mango ₹1"
+        value = int(match.group("number").replace(",", ""))
+        if match.group("k"):
+            value *= 1000
+        if value not in amounts:
+            amounts.append(value)
+    return amounts
+
+
+def cross_check_budget(intent: Intent, text: str) -> Intent:
+    """Compare the LLM's budget with what the regex finds; trust code when they disagree."""
+    amounts = find_budget_amounts(text)
+    if len(amounts) > 1 and not intent.budget_unclear:
+        log("budget_check", llm_budget=intent.budget, regex=amounts, action="set budget_unclear")
+        intent.budget_unclear = True
+    elif len(amounts) == 1 and not intent.budget_unclear and intent.budget != amounts[0]:
+        log("budget_check", llm_budget=intent.budget, regex=amounts, action="use regex value")
+        intent.budget = amounts[0]
+    return intent
