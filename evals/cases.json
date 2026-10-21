@@ -25,5 +25,8 @@
 
   {"id": "own1", "note": "local model sends null for empty fields (exact_qty: null) -> was always the fallback",
    "text": "Mango and lime please, budget Rs 900. Nothing else.", "budget": 900,
-   "checks": ["is_recommendation", "has:MANGO", "has:LIME", "valid_order"]}
+   "checks": ["is_recommendation", "has:MANGO", "has:LIME", "valid_order"]},
+  {"id": "own2", "note": "local model maps an unknown drink (cola) to catalogue SKUs the customer never named",
+   "text": "Only cola, Rs 700.",
+   "checks": ["is_cannot_fulfil", "empty_zero"]}
 ]
