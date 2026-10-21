@@ -19,6 +19,20 @@ class Intent(BaseModel):
     unknown_products: list[str]     # names not in catalogue, e.g. "cola"
     manipulation: bool              # tries to change prices/rules/discounts
 
+    @model_validator(mode="before")
+    @classmethod
+    def null_means_empty(cls, data):
+        """Some models send null instead of [] or {} for "nothing said". Treat it as empty.
+        (Not for `only` or `budget`, where null has its own meaning.)"""
+        if isinstance(data, dict):
+            for field in ("include", "exclude", "unknown_products"):
+                if field in data and data[field] is None:
+                    data[field] = []
+            for field in ("min_qty", "exact_qty"):
+                if field in data and data[field] is None:
+                    data[field] = {}
+        return data
+
     @model_validator(mode="after")
     def clean_skus(self):
         """Uppercase every SKU. Anything not in the catalogue goes to unknown_products."""

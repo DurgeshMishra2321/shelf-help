@@ -48,3 +48,12 @@ def test_gives_up_after_three_attempts(monkeypatch):
     fake_llm(monkeypatch, ["nope", "nope", "nope"])
     with pytest.raises(extract.ExtractionFailed):
         extract.extract("₹900 mango")
+
+
+def test_null_for_empty_fields_is_accepted(monkeypatch):
+    # Bug own1: llama3.2:3b sends null instead of {} / [] for "nothing said".
+    reply = json.loads(GOOD)
+    reply.update(exact_qty=None, min_qty=None, exclude=None, unknown_products=None)
+    fake_llm(monkeypatch, [json.dumps(reply)])
+    intent = extract.extract("₹900 mango")
+    assert intent.exact_qty == {} and intent.exclude == []
