@@ -1,6 +1,6 @@
 """A thin adapter so the LLM provider can be swapped with one env variable.
 
-    LLM_PROVIDER = anthropic (default) | openai | groq | gemini
+    LLM_PROVIDER = anthropic (default) | openai | groq | gemini | ollama (local, no key)
     LLM_MODEL    = optional model override
 
 The only function the rest of the code uses is complete(system, user).
@@ -20,6 +20,8 @@ PROVIDERS = {
     "groq":      ("GROQ_API_KEY",      "llama-3.3-70b-versatile",   "https://api.groq.com/openai/v1"),
     "gemini":    ("GEMINI_API_KEY",    "gemini-flash-lite-latest",
                   "https://generativelanguage.googleapis.com/v1beta/openai/"),
+    # Runs on this computer through Ollama (ollama.com). No API key needed.
+    "ollama":    (None,                "llama3.2:3b",               "http://localhost:11434/v1"),
 }
 
 
@@ -37,7 +39,7 @@ def provider() -> str:
 def check_config() -> None:
     """Exit with a clear message if the API key for the chosen provider is missing."""
     key_var = PROVIDERS[provider()][0]
-    if not os.getenv(key_var):
+    if key_var and not os.getenv(key_var):
         sys.exit(f"error: {key_var} is not set. Copy .env.example to .env and add your key "
                  f"(or set LLM_PROVIDER to a provider you have a key for).")
 
@@ -49,7 +51,8 @@ def complete(system: str, user: str, timeout: float = 20) -> str:
     model = os.getenv("LLM_MODEL") or default_model
     if name == "anthropic":
         return _anthropic(system, user, model, timeout)
-    return _openai_compatible(system, user, model, timeout, os.getenv(key_var), base_url)
+    api_key = os.getenv(key_var) if key_var else "ollama"   # Ollama ignores the key
+    return _openai_compatible(system, user, model, timeout, api_key, base_url)
 
 
 def _anthropic(system, user, model, timeout):
