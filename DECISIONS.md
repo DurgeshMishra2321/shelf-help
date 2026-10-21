@@ -4,8 +4,10 @@
 Model: turns free text into a structured Intent. Nothing else.
 Code: catalogue, stock, prices, totals, choosing the order, status, message numbers, validation.
 Why: the model never outputs a price, total or order, so a prompt injection has nothing to
-change, and every number can be checked. A regex also re-reads the budget from the text;
-if it finds one amount that differs from the model's, code wins; if it finds several, we ask.
+change, and every number can be checked. Code also double-checks the model: a regex re-reads
+the budget (one different amount → code wins; several → we ask), and any SKU the model returns
+that the text never names is dropped. The default local setup is Ollama `llama3.2:3b`: no API
+key, no quota; a small model is fine because code checks everything it says.
 
 ## Order selection
 Brute-force enumeration (385 combos), filtered by every rule in `rules.py`.
@@ -38,6 +40,9 @@ into breaking rules, and gives different answers on reruns. Enumeration is exact
   and keep them overridable with `LLM_MODEL`.
 - **Byte-order mark.** The tool created `evals/cases.json` with a byte-order mark, which crashed
   the eval runner on its first run. Caught by the runner's traceback; see BUGS.md.
+- **Trusted the model's JSON shape and SKUs too much.** The first version assumed the model would
+  send `{}` for empty fields and only name SKUs the customer said. The local model did neither
+  (evals `own1`, `own2`, both 0/5 red, then 5/5 after the fixes; see BUGS.md for commits).
 
 ## What still breaks
 - Budgets written in words ("nine hundred") rely on the model alone; the regex can't confirm them.
@@ -45,3 +50,7 @@ into breaking rules, and gives different answers on reruns. Enumeration is exact
   regex into "several amounts" → a needless clarification.
 - "only X and cola" treats cola as required and returns cannot_fulfil, even if the customer
   would accept X alone.
+- The product check only knows the words in `SKU_WORDS` (extract.py). A synonym not listed
+  there (e.g. "lemonade") is dropped as "not mentioned"; the order stays valid but misses it.
+- For "only cola" the small model often doesn't report cola as unknown, so the reply says
+  "none of the drinks you would accept are in stock" rather than "we don't carry cola".

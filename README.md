@@ -22,9 +22,16 @@ pip install -r requirements.txt
 cp .env.example .env        # then put your API key in .env
 ```
 
-`LLM_PROVIDER` in `.env` picks the provider: `anthropic` (default), `openai`, `groq` or `gemini`.
-Set the matching key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY` or `GEMINI_API_KEY`).
-`LLM_MODEL` optionally overrides the default model.
+`LLM_PROVIDER` in `.env` picks the provider: `anthropic` (default), `openai`, `groq`, `gemini`
+or `ollama`. Set the matching key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY` or
+`GEMINI_API_KEY`). `LLM_MODEL` optionally overrides the default model.
+
+### No API key: run a local model with Ollama
+
+1. Install Ollama from https://ollama.com and run `ollama pull llama3.2:3b`.
+2. Put one line in `.env`: `LLM_PROVIDER=ollama`
+3. That's it. The first call loads the model (can take ~2 minutes); after that each request
+   takes a few seconds. All evals pass 5/5 with this setup.
 
 ## The one command
 
