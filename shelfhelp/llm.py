@@ -47,6 +47,9 @@ def check_config() -> None:
 def complete(system: str, user: str, timeout: float = 20) -> str:
     name = provider()
     check_config()
+    if name == "ollama":
+        # The first call loads the model into memory, which can take ~2 minutes.
+        timeout = max(timeout, 180)
     key_var, default_model, base_url = PROVIDERS[name]
     model = os.getenv("LLM_MODEL") or default_model
     if name == "anthropic":
