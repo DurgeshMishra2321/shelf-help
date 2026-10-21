@@ -9,7 +9,8 @@ Every request that broke while building. Each one becomes an eval before it is f
 
 ## Operational finding (not a code bug)
 
-- **Google 503 "high demand" and 20 s timeouts** on `gemini-3.8-flash`. Two of six sample requests (r2, r4) used all 3 attempts and returned the safe fallback. The retry loop and fallback worked as designed; nothing was changed. Mitigations: lighter model via `LLM_MODEL`, paid tier, or rerun later.
+- **Google 503 "high demand" and 20 s timeouts** on `gemini-3.8-flash`. Two of six sample requests (r2, r4) used all 3 attempts and returned the safe fallback. The retry loop and fallback worked as designed. Fix: switched the default to the `gemini-flash-lite-latest` alias (`1229dd5`); after that all six sample requests were correct with zero LLM errors.
+- **Free-tier quota exhausted (429).** The first full eval run (11 cases x 5 runs, up to 3 attempts each) used up the key's free-tier request quota; every later call failed with `429 ... generate_content_free_tier_requests` or timed out, and every response was the safe fallback. Not fixable in code. Mitigations: wait for the quota to reset, enable billing on the key, run a few cases at a time, and `EVAL_PAUSE_SECONDS` in `evals/run_evals.py` for per-minute limits.
 
 ## Still to add
 
