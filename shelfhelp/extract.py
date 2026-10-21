@@ -69,7 +69,8 @@ def extract(text: str, attempts: list | None = None) -> Intent:
         attempts.append({"attempt": attempt, "raw": raw})
         try:
             intent = Intent.model_validate_json(strip_code_fences(raw))
-            return cross_check_budget(intent, text)
+            intent = cross_check_budget(intent, text)
+            return cross_check_products(intent, text)
         except ValidationError as e:
             log("invalid_llm_output", attempt=attempt, error=str(e))
             # Tell the model what was wrong and try again.
@@ -124,4 +125,37 @@ def cross_check_budget(intent: Intent, text: str) -> Intent:
     elif len(amounts) == 1 and not intent.budget_unclear and intent.budget != amounts[0]:
         log("budget_check", llm_budget=intent.budget, regex=amounts, action="use regex value")
         intent.budget = amounts[0]
+    return intent
+
+
+# ---- Code-side product check (defence in depth) ---------------------------
+
+# Words that show the customer named a SKU. A SKU the model returns but the text
+# never names was invented by the model (e.g. "only cola" -> LIME), so we drop it.
+SKU_WORDS = {
+    "MANGO": ["mango", "aam"],
+    "LIME":  ["lime", "nimbu", "lemon", "soda"],
+    "WATER": ["water", "pani", "paani"],
+    "BERRY": ["berry", "berries", "fizz"],
+}
+
+
+def mentioned_skus(text: str) -> set[str]:
+    lower = text.lower()
+    return {sku for sku, words in SKU_WORDS.items()
+            if any(re.search(r"\b" + word, lower) for word in words)}
+
+
+def cross_check_products(intent: Intent, text: str) -> Intent:
+    """Remove SKUs from the intent that the customer never mentioned."""
+    named = mentioned_skus(text)
+    before = intent.model_dump()
+    intent.include = [sku for sku in intent.include if sku in named]
+    intent.exclude = [sku for sku in intent.exclude if sku in named]
+    if intent.only is not None:
+        intent.only = [sku for sku in intent.only if sku in named]
+    intent.min_qty = {sku: q for sku, q in intent.min_qty.items() if sku in named}
+    intent.exact_qty = {sku: q for sku, q in intent.exact_qty.items() if sku in named}
+    if intent.model_dump() != before:
+        log("product_check", named=sorted(named), llm=before, action="dropped SKUs not in the text")
     return intent

@@ -44,3 +44,18 @@ def test_several_amounts_force_budget_unclear():
 def test_no_amount_keeps_the_llm_value():
     intent = cross_check_budget(make_intent(budget=None), "Suggest an order with mango.")
     assert intent.budget is None
+
+
+def test_skus_the_customer_never_named_are_dropped():
+    # Bug own2: for "Only cola" the local model returned only=[LIME, MANGO].
+    from shelfhelp.extract import cross_check_products
+    intent = cross_check_products(make_intent(only=["LIME", "MANGO"], include=["LIME"]),
+                                  "Only cola, Rs 700.")
+    assert intent.only == [] and intent.include == []
+
+
+def test_named_skus_are_kept():
+    from shelfhelp.extract import cross_check_products
+    intent = cross_check_products(make_intent(include=["MANGO", "LIME"], exclude=["WATER"]),
+                                  "Mangoes and nimbu soda, no paani, Rs 900")
+    assert intent.include == ["MANGO", "LIME"] and intent.exclude == ["WATER"]
