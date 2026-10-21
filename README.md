@@ -78,3 +78,11 @@ python -m venv /tmp/clean && source /tmp/clean/bin/activate         # macOS / Li
 pip install -r requirements.txt
 python run.py evals/sample_requests.json > /tmp/out.json && python -m json.tool /tmp/out.json
 ```
+
+## Live demo
+
+```bash
+python demo.py
+```
+Type a retailer request as plain text and press Enter; see the JSON response immediately.
+Type `quit` to stop. This is for demos only — the real interface is the batch command above.
