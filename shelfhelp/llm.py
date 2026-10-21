@@ -18,7 +18,7 @@ PROVIDERS = {
     "anthropic": ("ANTHROPIC_API_KEY", "claude-opus-5-5",           None),
     "openai":    ("OPENAI_API_KEY",    "gpt-4o-mini",               None),
     "groq":      ("GROQ_API_KEY",      "llama-3.3-70b-versatile",   "https://api.groq.com/openai/v1"),
-    "gemini":    ("GEMINI_API_KEY",    "gemini-3.8-flash",
+    "gemini":    ("GEMINI_API_KEY",    "gemini-flash-lite-latest",
                   "https://generativelanguage.googleapis.com/v1beta/openai/"),
 }
 
